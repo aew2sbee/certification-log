@@ -2,7 +2,7 @@
 
 IT資格の過去問・模擬問題の解答記録を GitHub で管理し、GitHub Pages で正答率を確認するための静的サイトです。
 ビルド不要の HTML / CSS / JavaScript だけで動き、外部ライブラリは使っていません。
-サイトのファイルは `src/`、記録データは資格ごとのフォルダ（`ap/` など）に置き、GitHub Actions が両方を並べて公開します。
+サイトのファイルは `src/`、記録データは `certification/` の資格ごとのフォルダに置き、GitHub Actions が両方を並べて公開します。
 
 - 公開URL：https://<ユーザー名>.github.io/certification-log/
 - 記録するのは **問題番号・正誤・得点・分からない単語だけ** です。問題文や選択肢は載せません。
@@ -12,8 +12,8 @@ IT資格の過去問・模擬問題の解答記録を GitHub で管理し、GitH
 | ページ | 内容 |
 | --- | --- |
 | トップ（`index.html`） | 資格ごとのカード：資格名、状態（学習中 / 合格）、合格日、全体の正答率、解いた問題数。学習中の資格は次の試験までの残り日数を大きく表示 |
-| 資格ページ（`cert.html?id=ap` など） | 問題セット・回ごとの正答率と合否判定（科目別・トータル）、苦手問題、分野別の正答率、記述式の分野別平均得点率と選択候補、解答グリッド、メモ（`notes/`）の表示 |
-| 単語帳（`glossary.html`） | 全資格の「分からない単語」の一覧。単語の検索、資格での絞り込み、並び替え。`glossary.html?cert=ap` で資格を指定して開けます |
+| 資格ページ（`cert.html?id=202610_ap` など） | 問題セット・回ごとの正答率と合否判定（科目別・トータル）、苦手問題、分野別の正答率、記述式の分野別平均得点率と選択候補、解答グリッド、メモ（`notes/`）の表示 |
+| 単語帳（`glossary.html`） | 全資格の「分からない単語」の一覧。単語の検索、資格での絞り込み、並び替え。`glossary.html?cert=202610_ap` で資格を指定して開けます |
 
 ## ディレクトリ構成
 
@@ -25,29 +25,31 @@ certification-log/
 │   └── pages.yml         ← main への push で GitHub Pages に公開
 ├── src/                  ← サイトの HTML / CSS / JS
 │   ├── index.html        ← トップ
-│   ├── cert.html         ← 資格ページ（cert.html?id=ap のように資格IDを渡す）
+│   ├── cert.html         ← 資格ページ（cert.html?id=202610_ap のようにフォルダ名を渡す）
 │   ├── glossary.html     ← 単語帳
 │   └── assets/
 │       ├── style.css     ← 全ページ共通のスタイル（ライト / ダーク対応）
 │       └── app.js        ← TSV の読み込み・集計・描画（全ページ共通）
-├── certs.json            ← 表示する資格の一覧（この順でトップに並ぶ）
-├── ap/                   ← 応用情報技術者試験の記録データ
-│   ├── cert.json         ← 資格の設定とデータファイルの一覧
-│   ├── r7-autumn-a.tsv   ← 科目A（選択式）の記録
-│   ├── r7-autumn-b.tsv   ← 科目B（記述式）の記録
-│   └── notes/            ← 問題ごとのメモ（AI との質疑など）
-├── sg/                   ← 情報セキュリティマネジメント試験
-├── fe/                   ← 基本情報技術者試験
-└── clf/                  ← AWS Certified Cloud Practitioner
+└── certification/        ← 記録データ
+    ├── certs.json        ← 表示する資格の一覧（この順でトップに並ぶ）
+    ├── 202503_sg/        ← 情報セキュリティマネジメント試験
+    ├── 202505_fe/        ← 基本情報技術者試験
+    ├── 202603_aws-clf/   ← AWS Certified Cloud Practitioner
+    └── 202610_ap/        ← 応用情報技術者試験
+        ├── cert.json         ← 資格の設定とデータファイルの一覧
+        ├── r7-autumn-a.tsv   ← 科目A（選択式）の記録
+        ├── r7-autumn-b.tsv   ← 科目B（記述式）の記録
+        └── notes/            ← 問題ごとのメモ（AI との質疑など）
 ```
 
-公開時は `src/` の中身と、`certs.json`・`certs.json` に書かれた資格フォルダが同じ階層に並びます。
+資格フォルダの名前は `年月_資格ID`（例：`202610_ap`）です。フォルダ名がそのまま資格ページの URL（`cert.html?id=202610_ap`）になります。
+
+公開時は `src/` の中身と `certification/` が同じ階層に並びます。
 
 ```
 https://<ユーザー名>.github.io/certification-log/
 ├── index.html, cert.html, glossary.html, assets/   ← src/ の中身
-├── certs.json
-└── ap/, sg/, fe/, clf/
+└── certification/                                  ← 記録データ
 ```
 
 ## データ形式
@@ -60,7 +62,7 @@ https://<ユーザー名>.github.io/certification-log/
 - `unknown`（分からなかった単語）は `;` 区切りで複数書けます（全角の `；` も可）
 - Excel の「Unicode テキスト」「テキスト（タブ区切り）」で保存したファイルも読めますが、基本は UTF-8 にしてください
 
-### 選択式（応用情報の科目A、sg・fe・clf）
+### 選択式（応用情報の科目A、sg・fe・aws-clf）
 
 ```tsv
 set	no	section	field	round	date	result	unknown
@@ -80,7 +82,7 @@ mock01	2	A	セキュリティ管理	2	2025-05-10	OK
 | unknown | 分からなかった単語。複数は `;` 区切り |
 
 `section` が cert.json の `sections` にない値の場合、セクションが1つだけの資格ではそのセクションとして集計します
-（AWS のように `section` にドメイン名を書いても動きます。サンプルの clf は `section` を `CLF`、ドメインを `field` にしています）。
+（AWS のように `section` にドメイン名を書いても動きます。サンプルの aws-clf は `section` を `CLF`、ドメインを `field` にしています）。
 
 ### 記述式（応用情報の科目B）
 
@@ -119,7 +121,7 @@ r7-autumn	6	データベース	1	2026-11-01	12	20	正規化
 
 | キー | 内容 |
 | --- | --- |
-| id | 資格ID（フォルダ名と同じにする） |
+| id | 短い資格ID（フォルダ名の `年月_` より後ろ。例：`ap`）。単語帳のラベルなどに大文字で表示 |
 | name | 表示名 |
 | status | `studying`（学習中）/ `passed`（合格） |
 | passedOn | 合格日 `"YYYY-MM-DD"`。未定なら `null` |
@@ -134,12 +136,12 @@ r7-autumn	6	データベース	1	2026-11-01	12	20	正規化
 
 ブラウザはフォルダの中身を一覧できないため、TSV とメモのファイル名は cert.json に書く必要があります。
 
-### certs.json
+### certification/certs.json
 
-トップと単語帳に表示する資格IDの配列です。この順でカードが並びます。
+トップと単語帳に表示する資格フォルダ名の配列です。この順でカードが並びます。
 
 ```json
-["ap", "sg", "fe", "clf"]
+["202610_ap", "202503_sg", "202505_fe", "202603_aws-clf"]
 ```
 
 ### メモ（notes/）
@@ -157,13 +159,13 @@ r7-autumn	6	データベース	1	2026-11-01	12	20	正規化
 
 ## 新しい資格の追加方法
 
-1. 既存の資格フォルダ（例：`sg/`）をコピーし、フォルダ名を新しい資格IDにする（例：`db/`）
+1. `certification/` 内の既存の資格フォルダ（例：`202505_fe/`）をコピーし、フォルダ名を `年月_資格ID` にする（例：`202703_db/`）
 2. `cert.json` を編集する（`id`・`name`・`status`・`passLine`・`passRule`・`sections`・`examDates`・`sets`・`notes`）
 3. サンプルの TSV を削除・差し替えし、`notes/` の中身を空にする（`.gitkeep` は残す）
-4. ルートの `certs.json` に資格IDを追加する
+4. `certification/certs.json` にフォルダ名を追加する
 
-`src/` の HTML を追加・変更する必要はありません（`cert.html?id=db` で表示されます）。
-`certs.json` に書いていないフォルダは公開されません。
+`src/` の HTML を追加・変更する必要はありません（`cert.html?id=202703_db` で表示されます）。
+`certs.json` に書いていないフォルダはトップと単語帳には出ません（`certification/` の中身はすべて公開されます）。
 
 ## ローカルでの確認方法
 
@@ -175,7 +177,7 @@ python -m http.server 8000
 ```
 
 ブラウザで http://localhost:8000/src/ を開きます。
-ローカルで `src/` から開いたときは、記録データを 1 つ上の階層（リポジトリのルート）から読みます。
+ローカルで `src/` から開いたときは、記録データを 1 つ上の階層の `certification/` から読みます。
 
 ## 集計ルール
 
@@ -193,7 +195,7 @@ GitHub Pages はブランチから公開する場合ルートか `/docs` しか�
 
 1. GitHub の Settings → Pages を開く
 2. Build and deployment の Source を「**GitHub Actions**」にする
-3. main に push すると `.github/workflows/pages.yml` が動き、`src/` の中身・`certs.json`・`certs.json` に書かれた資格フォルダをまとめて公開します（Actions タブから手動実行も可）
+3. main に push すると `.github/workflows/pages.yml` が動き、`src/` の中身と `certification/` をまとめて公開します（Actions タブから手動実行も可）
 4. 数分後に https://<ユーザー名>.github.io/certification-log/ で公開されます
 
 ワークフローはファイルをコピーして並べるだけで、ビルドはしていません。
@@ -202,11 +204,13 @@ GitHub Pages はブランチから公開する場合ルートか `/docs` しか�
 
 - [ ] GitHub の Settings → Pages で Source を「GitHub Actions」にする
 - [ ] この README の `<ユーザー名>`（チェックリスト以外の3か所）
-- [ ] `sg/cert.json`・`fe/cert.json`・`clf/cert.json` の `passedOn`（合格日を `"YYYY-MM-DD"` で。現在は `null`）
-- [ ] 各資格のサンプルデータ（`ap/r7-autumn-a.tsv`・`ap/r7-autumn-b.tsv`・`sg/mock01.tsv`・`fe/sample.tsv`・`clf/sample.tsv`）を実際の記録に差し替え
-- [ ] サンプルのメモ `ap/notes/r7-autumn-a-q12.md` を差し替えまたは削除（削除した場合は `ap/cert.json` の `notes` からも消す）
+以下のパスは `certification/` からの相対パスです。
+
+- [ ] `202503_sg/cert.json`・`202505_fe/cert.json`・`202603_aws-clf/cert.json` の `passedOn`（合格日を `"YYYY-MM-DD"` で。現在は `null`）
+- [ ] 各資格のサンプルデータ（`202610_ap/r7-autumn-a.tsv`・`202610_ap/r7-autumn-b.tsv`・`202503_sg/mock01.tsv`・`202505_fe/sample.tsv`・`202603_aws-clf/sample.tsv`）を実際の記録に差し替え
+- [ ] サンプルのメモ `202610_ap/notes/r7-autumn-a-q12.md` を差し替えまたは削除（削除した場合は `202610_ap/cert.json` の `notes` からも消す）
 - [ ] 各 cert.json の `sets` の `id`・`name`（実際に解いた問題セットに合わせる）
-- [ ] `ap/cert.json` の `examDates`（受験する回の日程が確定したら確認）
+- [ ] `202610_ap/cert.json` の `examDates`（受験する回の日程が確定したら確認）
 
 ## 注意
 

@@ -1,5 +1,5 @@
 # main に push されたら GitHub Pages に公開する。
-# src/ の HTML / CSS / JS と、certs.json に書かれた資格フォルダ（記録データ）を同じ階層に並べて公開する。
+# src/ の HTML / CSS / JS と、記録データの certification/ を同じ階層に並べて公開する。
 name: Deploy to GitHub Pages
 
 on:
@@ -28,11 +28,8 @@ jobs:
       - name: 公開するファイルをまとめる
         run: |
           mkdir _site
-          cp certs.json _site/
-          for id in $(jq -r '.[]' certs.json); do
-            cp -r "$id" _site/
-          done
           cp -r src/. _site/
+          cp -r certification _site/
 
       - uses: actions/configure-pages@v6
 

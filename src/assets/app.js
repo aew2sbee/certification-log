@@ -3,16 +3,16 @@
  *
  * <body data-page="..."> でページの種類を受け取る。
  *   home     … トップ（資格一覧）
- *   cert     … 資格ページ（cert.html?id=ap のように資格IDを渡す）
+ *   cert     … 資格ページ（cert.html?id=202610_ap のように certification/ 内のフォルダ名を渡す）
  *   glossary … 分からない単語の一覧
  */
 (() => {
   'use strict';
 
   const PAGE = document.body.dataset.page || 'home';
-  // 公開時は src/ の中身と記録データ（certs.json・資格フォルダ）が同じ階層に並ぶ。
-  // ローカルでリポジトリのルートから src/ を開いたときは、データは 1 つ上の階層にある
-  const DATA = /\/src\/[^/]*$/.test(location.pathname) ? '../' : './';
+  // 記録データは certification/ にある。公開時は src/ の中身と certification/ が同じ階層に並び、
+  // ローカルでリポジトリのルートから src/ を開いたときは 1 つ上の階層にある
+  const DATA = `${/\/src\/[^/]*$/.test(location.pathname) ? '../' : './'}certification/`;
   const STATUS = { studying: '学習中', passed: '✓ 合格' };
   const WEEK = '日月火水木金土';
   const EPS = 1e-9;
@@ -205,7 +205,8 @@
 
     for (const set of sets) set.sections = sections.filter((s) => set.sectionIds.has(s.id));
     return {
-      id,
+      id, // フォルダ名（URL やファイルの場所に使う）
+      label: String(cert.id || id).toUpperCase(), // 単語帳などに出す短い名前
       base,
       cert,
       passLine,
@@ -423,7 +424,7 @@
 
   async function renderCert(main) {
     const id = new URLSearchParams(location.search).get('id');
-    if (!id) throw new Error('資格IDが指定されていません（cert.html?id=ap のように開いてください）');
+    if (!id) throw new Error('資格が指定されていません（cert.html?id=202610_ap のようにフォルダ名を付けて開いてください）');
     const data = await loadCert(id);
     const name = data.cert.name || id;
     document.title = `${name} | certification-log`;
@@ -789,9 +790,7 @@
       const { data, r } = occ[0];
       const rounds = uniq(occ.map((o) => o.r.round)).sort((a, b) => a - b).join('・');
       const q = { set: r.set, section: r.section, no: r.no };
-      return `<li><a href="${esc(certUrl(data.id, qid(r.set, r.section, r.no)))}"><span class="tag">${esc(
-        data.id.toUpperCase()
-      )}</span>${esc(questionLabel(data, q))}</a><span class="sub">（${rounds}回目）</span></li>`;
+      return `<li><a href="${esc(certUrl(data.id, qid(r.set, r.section, r.no)))}"><span class="tag">${esc(data.label)}</span>${esc(questionLabel(data, q))}</a><span class="sub">（${rounds}回目）</span></li>`;
     };
     const row = (e) => {
       const places = [...groupBy(e.occ, (o) => `${o.data.id}\t${qid(o.r.set, o.r.section, o.r.no)}`).values()];
