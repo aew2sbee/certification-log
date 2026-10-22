@@ -2,6 +2,7 @@
 
 IT資格の過去問・模擬問題の解答記録を GitHub で管理し、GitHub Pages で正答率を確認するための静的サイトです。
 ビルド不要の HTML / CSS / JavaScript だけで動き、外部ライブラリは使っていません。
+サイトのファイルは `src/`、記録データは資格ごとのフォルダ（`ap/` など）に置き、GitHub Actions が両方を並べて公開します。
 
 - 公開URL：https://<ユーザー名>.github.io/certification-log/
 - 記録するのは **問題番号・正誤・得点・分からない単語だけ** です。問題文や選択肢は載せません。
@@ -11,7 +12,7 @@ IT資格の過去問・模擬問題の解答記録を GitHub で管理し、GitH
 | ページ | 内容 |
 | --- | --- |
 | トップ（`index.html`） | 資格ごとのカード：資格名、状態（学習中 / 合格）、合格日、全体の正答率、解いた問題数。学習中の資格は次の試験までの残り日数を大きく表示 |
-| 資格ページ（`ap/` など） | 問題セット・回ごとの正答率と合否判定（科目別・トータル）、苦手問題、分野別の正答率、記述式の分野別平均得点率と選択候補、解答グリッド、メモ（`notes/`）の表示 |
+| 資格ページ（`cert.html?id=ap` など） | 問題セット・回ごとの正答率と合否判定（科目別・トータル）、苦手問題、分野別の正答率、記述式の分野別平均得点率と選択候補、解答グリッド、メモ（`notes/`）の表示 |
 | 単語帳（`glossary.html`） | 全資格の「分からない単語」の一覧。単語の検索、資格での絞り込み、並び替え。`glossary.html?cert=ap` で資格を指定して開けます |
 
 ## ディレクトリ構成
@@ -20,15 +21,17 @@ IT資格の過去問・模擬問題の解答記録を GitHub で管理し、GitH
 certification-log/
 ├── README.md
 ├── .gitignore
-├── .nojekyll             ← GitHub Pages で Jekyll の変換を止める（notes の .md をそのまま配信するため）
-├── index.html            ← トップ
-├── glossary.html         ← 単語帳
+├── .github/workflows/
+│   └── pages.yml         ← main への push で GitHub Pages に公開
+├── src/                  ← サイトの HTML / CSS / JS
+│   ├── index.html        ← トップ
+│   ├── cert.html         ← 資格ページ（cert.html?id=ap のように資格IDを渡す）
+│   ├── glossary.html     ← 単語帳
+│   └── assets/
+│       ├── style.css     ← 全ページ共通のスタイル（ライト / ダーク対応）
+│       └── app.js        ← TSV の読み込み・集計・描画（全ページ共通）
 ├── certs.json            ← 表示する資格の一覧（この順でトップに並ぶ）
-├── assets/
-│   ├── style.css         ← 全ページ共通のスタイル（ライト / ダーク対応）
-│   └── app.js            ← TSV の読み込み・集計・描画（全ページ共通）
-├── ap/                   ← 応用情報技術者試験
-│   ├── index.html        ← 全資格共通の数行だけのファイル（中身は ../assets/app.js が描画）
+├── ap/                   ← 応用情報技術者試験の記録データ
 │   ├── cert.json         ← 資格の設定とデータファイルの一覧
 │   ├── r7-autumn-a.tsv   ← 科目A（選択式）の記録
 │   ├── r7-autumn-b.tsv   ← 科目B（記述式）の記録
@@ -38,8 +41,14 @@ certification-log/
 └── clf/                  ← AWS Certified Cloud Practitioner
 ```
 
-各資格フォルダの `index.html` はすべて同じ内容です。資格IDはフォルダ名から判定します
-（`<body data-cert="ap">` のように書けば明示的に指定もできます）。
+公開時は `src/` の中身と、`certs.json`・`certs.json` に書かれた資格フォルダが同じ階層に並びます。
+
+```
+https://<ユーザー名>.github.io/certification-log/
+├── index.html, cert.html, glossary.html, assets/   ← src/ の中身
+├── certs.json
+└── ap/, sg/, fe/, clf/
+```
 
 ## データ形式
 
@@ -153,18 +162,20 @@ r7-autumn	6	データベース	1	2026-11-01	12	20	正規化
 3. サンプルの TSV を削除・差し替えし、`notes/` の中身を空にする（`.gitkeep` は残す）
 4. ルートの `certs.json` に資格IDを追加する
 
-`index.html` はそのままで動きます。
+`src/` の HTML を追加・変更する必要はありません（`cert.html?id=db` で表示されます）。
+`certs.json` に書いていないフォルダは公開されません。
 
 ## ローカルでの確認方法
 
 データを `fetch` で読むため、HTML ファイルを直接ダブルクリックで開くと表示されません。
-リポジトリのルートで簡易サーバーを起動して確認します。
+**リポジトリのルート**で簡易サーバーを起動し、`/src/` を開きます。
 
 ```sh
 python -m http.server 8000
 ```
 
-ブラウザで http://localhost:8000/ を開きます。
+ブラウザで http://localhost:8000/src/ を開きます。
+ローカルで `src/` から開いたときは、記録データを 1 つ上の階層（リポジトリのルート）から読みます。
 
 ## 集計ルール
 
@@ -178,15 +189,19 @@ python -m http.server 8000
 
 ## GitHub Pages の公開設定
 
-1. GitHub の Settings → Pages を開く
-2. Build and deployment の Source を「Deploy from a branch」、Branch を `main` / `/ (root)` にして保存
-3. 数分後に https://<ユーザー名>.github.io/certification-log/ で公開されます
+GitHub Pages はブランチから公開する場合ルートか `/docs` しか選べないため、GitHub Actions で公開します。
 
-ルートの `.nojekyll` は消さないでください（消すと Jekyll が `notes/*.md` を HTML に変換してしまい、メモが読めなくなります）。
+1. GitHub の Settings → Pages を開く
+2. Build and deployment の Source を「**GitHub Actions**」にする
+3. main に push すると `.github/workflows/pages.yml` が動き、`src/` の中身・`certs.json`・`certs.json` に書かれた資格フォルダをまとめて公開します（Actions タブから手動実行も可）
+4. 数分後に https://<ユーザー名>.github.io/certification-log/ で公開されます
+
+ワークフローはファイルをコピーして並べるだけで、ビルドはしていません。
 
 ## 後で記入・差し替えが必要な項目
 
-- [ ] この README の `<ユーザー名>`（2か所）
+- [ ] GitHub の Settings → Pages で Source を「GitHub Actions」にする
+- [ ] この README の `<ユーザー名>`（チェックリスト以外の3か所）
 - [ ] `sg/cert.json`・`fe/cert.json`・`clf/cert.json` の `passedOn`（合格日を `"YYYY-MM-DD"` で。現在は `null`）
 - [ ] 各資格のサンプルデータ（`ap/r7-autumn-a.tsv`・`ap/r7-autumn-b.tsv`・`sg/mock01.tsv`・`fe/sample.tsv`・`clf/sample.tsv`）を実際の記録に差し替え
 - [ ] サンプルのメモ `ap/notes/r7-autumn-a-q12.md` を差し替えまたは削除（削除した場合は `ap/cert.json` の `notes` からも消す）

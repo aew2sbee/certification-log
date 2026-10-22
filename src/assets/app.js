@@ -1,16 +1,18 @@
 /*
  * certification-log 共通スクリプト（TSV の読み込み・集計・描画）
  *
- * <body data-page="..." data-root="..."> でページの種類とサイトのルートを受け取る。
+ * <body data-page="..."> でページの種類を受け取る。
  *   home     … トップ（資格一覧）
- *   cert     … 各資格ページ。資格IDは data-cert、なければフォルダ名から判定
+ *   cert     … 資格ページ（cert.html?id=ap のように資格IDを渡す）
  *   glossary … 分からない単語の一覧
  */
 (() => {
   'use strict';
 
-  const ROOT = document.body.dataset.root || './';
   const PAGE = document.body.dataset.page || 'home';
+  // 公開時は src/ の中身と記録データ（certs.json・資格フォルダ）が同じ階層に並ぶ。
+  // ローカルでリポジトリのルートから src/ を開いたときは、データは 1 つ上の階層にある
+  const DATA = /\/src\/[^/]*$/.test(location.pathname) ? '../' : './';
   const STATUS = { studying: '学習中', passed: '✓ 合格' };
   const WEEK = '日月火水木金土';
   const EPS = 1e-9;
@@ -54,6 +56,7 @@
   const fmtRange = (e) => (e.to && e.to !== e.from ? `${fmtDate(e.from)} 〜 ${fmtDate(e.to)}` : fmtDate(e.from));
   const shortDate = (s) => (parseDate(s) ? s.slice(5).replace('-', '/') : s);
 
+  const certUrl = (id, hash = '') => `cert.html?id=${encodeURIComponent(id)}${hash ? `#${encodeURIComponent(hash)}` : ''}`;
   // 問題を一意に表すID（解答グリッドの行のアンカーにも使う）とメモのファイル名
   const qid = (set, section, no) => `q-${set}-${section}-${no}`.replace(/\s+/g, '_');
   const noteName = (set, section, no) => `${set}-${String(section).toLowerCase()}-q${no}.md`;
@@ -108,7 +111,7 @@
 
   // cert.json と、そこに書かれた TSV をすべて読み込んで 1 資格分のデータにする
   async function loadCert(id) {
-    const base = `${ROOT}${encodeURIComponent(id)}/`;
+    const base = `${DATA}${encodeURIComponent(id)}/`;
     const cert = await fetchJSON(`${base}cert.json`);
     const passLine = Number(cert.passLine ?? 0.6);
     const sections = (cert.sections?.length ? cert.sections : [{ id: 'A', name: '全体' }]).map((s) => ({
@@ -359,15 +362,15 @@
 
   function renderShell() {
     const nav = [
-      ['home', '', '資格一覧'],
+      ['home', './', '資格一覧'],
       ['glossary', 'glossary.html', '単語帳'],
     ];
     document.body.insertAdjacentHTML(
       'afterbegin',
       `<a class="skip" href="#main">本文へ移動</a>
       <header class="site-header"><div class="wrap">
-        <a class="brand" href="${ROOT}">certification-log</a>
-        <nav aria-label="サイト">${nav.map(([page, href, label]) => `<a href="${ROOT}${href}"${PAGE === page ? ' aria-current="page"' : ''}>${label}</a>`).join('')}</nav>
+        <a class="brand" href="./">certification-log</a>
+        <nav aria-label="サイト">${nav.map(([page, href, label]) => `<a href="${href}"${PAGE === page ? ' aria-current="page"' : ''}>${label}</a>`).join('')}</nav>
       </div></header>
       <main id="main" class="wrap"><p class="loading">読み込み中…</p></main>
       <footer class="site-footer"><div class="wrap">問題文・選択肢は掲載せず、問題番号・正誤・得点・分からない単語のみを記録しています。</div></footer>`
@@ -378,7 +381,7 @@
   function showError(main, err) {
     const hint =
       location.protocol === 'file:'
-        ? '<p>HTML ファイルを直接開くとデータを読み込めません。リポジトリのルートで <code>python -m http.server</code> を実行し、<code>http://localhost:8000/</code> を開いてください。</p>'
+        ? '<p>HTML ファイルを直接開くとデータを読み込めません。リポジトリのルートで <code>python -m http.server</code> を実行し、<code>http://localhost:8000/src/</code> を開いてください。</p>'
         : '';
     main.innerHTML = `<div class="alert"><p><strong>読み込みに失敗しました。</strong>${esc(err.message)}</p>${hint}</div>`;
     console.error(err);
@@ -387,7 +390,7 @@
   /* ---------- トップ ---------- */
 
   async function renderHome(main) {
-    const ids = await fetchJSON(`${ROOT}certs.json`);
+    const ids = await fetchJSON(`${DATA}certs.json`);
     const results = await Promise.allSettled(ids.map(loadCert));
     const card = (r, i) => {
       if (r.status === 'rejected') {
@@ -395,7 +398,7 @@
       }
       const data = r.value;
       const { t, solved, lastDate } = overview(data);
-      return `<a class="card cert-card" href="${esc(data.base)}">
+      return `<a class="card cert-card" href="${esc(certUrl(data.id))}">
         <div class="card-head"><h2>${esc(data.cert.name || data.id)}</h2>${statusBadge(data.cert.status)}</div>
         ${examBlock(data.cert)}
         <div class="card-rate">
@@ -418,14 +421,9 @@
 
   /* ---------- 資格ページ ---------- */
 
-  function certIdFromPath() {
-    const parts = location.pathname.split('/').filter(Boolean);
-    if (parts.length && /\.html?$/i.test(parts.at(-1))) parts.pop();
-    return decodeURIComponent(parts.at(-1) || '');
-  }
-
   async function renderCert(main) {
-    const id = document.body.dataset.cert || certIdFromPath();
+    const id = new URLSearchParams(location.search).get('id');
+    if (!id) throw new Error('資格IDが指定されていません（cert.html?id=ap のように開いてください）');
     const data = await loadCert(id);
     const name = data.cert.name || id;
     document.title = `${name} | certification-log`;
@@ -436,7 +434,7 @@
           <p class="eyebrow">${statusBadge(data.cert.status)}<span>合格基準：${esc(ruleText(data))}</span></p>
           <h1>${esc(name)}</h1>
           ${statsList(data)}
-          <p class="links"><a href="${ROOT}glossary.html?cert=${encodeURIComponent(id)}">この資格の分からない単語を見る →</a></p>
+          <p class="links"><a href="glossary.html?cert=${encodeURIComponent(id)}">この資格の分からない単語を見る →</a></p>
         </div>
         ${examBlock(data.cert)}
       </section>`,
@@ -742,7 +740,7 @@
   /* ---------- 単語帳 ---------- */
 
   async function renderGlossary(main) {
-    const ids = await fetchJSON(`${ROOT}certs.json`);
+    const ids = await fetchJSON(`${DATA}certs.json`);
     const results = await Promise.allSettled(ids.map(loadCert));
     const datas = results.filter((r) => r.status === 'fulfilled').map((r) => r.value);
     const warnings = results.flatMap((r, i) => (r.status === 'rejected' ? [`${ids[i]}：${r.reason.message}`] : r.value.warnings));
@@ -791,7 +789,7 @@
       const { data, r } = occ[0];
       const rounds = uniq(occ.map((o) => o.r.round)).sort((a, b) => a - b).join('・');
       const q = { set: r.set, section: r.section, no: r.no };
-      return `<li><a href="${esc(data.base)}#${esc(encodeURIComponent(qid(r.set, r.section, r.no)))}"><span class="tag">${esc(
+      return `<li><a href="${esc(certUrl(data.id, qid(r.set, r.section, r.no)))}"><span class="tag">${esc(
         data.id.toUpperCase()
       )}</span>${esc(questionLabel(data, q))}</a><span class="sub">（${rounds}回目）</span></li>`;
     };
