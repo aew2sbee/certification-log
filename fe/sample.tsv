@@ -1,0 +1,31 @@
+set	no	section	field	round	date	result	unknown
+sample	1	A	基礎理論	1	2025-01-12	OK	
+sample	2	A	コンピュータシステム	1	2025-01-12	NG	キャッシュメモリ;ヒット率
+sample	3	A	技術要素	1	2025-01-12	OK	
+sample	4	A	開発技術	1	2025-01-12	NG	ブラックボックステスト
+sample	5	A	マネジメント	1	2025-01-12	OK	
+sample	6	A	ストラテジ	1	2025-01-12	NG	ROE
+sample	1	B	アルゴリズムとプログラミング	1	2025-01-12	NG	トレース
+sample	2	B	アルゴリズムとプログラミング	1	2025-01-12	OK	
+sample	3	B	アルゴリズムとプログラミング	1	2025-01-12	NG	二分探索
+sample	4	B	情報セキュリティ	1	2025-01-12	OK	
+sample	1	A	基礎理論	2	2025-01-26	OK	
+sample	2	A	コンピュータシステム	2	2025-01-26	OK	
+sample	3	A	技術要素	2	2025-01-26	OK	
+sample	4	A	開発技術	2	2025-01-26	NG	ホワイトボックステスト
+sample	5	A	マネジメント	2	2025-01-26	OK	
+sample	6	A	ストラテジ	2	2025-01-26	OK	
+sample	1	B	アルゴリズムとプログラミング	2	2025-01-26	OK	
+sample	2	B	アルゴリズムとプログラミング	2	2025-01-26	OK	
+sample	3	B	アルゴリズムとプログラミング	2	2025-01-26	NG	二分探索
+sample	4	B	情報セキュリティ	2	2025-01-26	OK	
+sample	1	A	基礎理論	3	2025-02-09	OK	
+sample	2	A	コンピュータシステム	3	2025-02-09	OK	
+sample	3	A	技術要素	3	2025-02-09	NG	デッドロック
+sample	4	A	開発技術	3	2025-02-09	OK	
+sample	5	A	マネジメント	3	2025-02-09	OK	
+sample	6	A	ストラテジ	3	2025-02-09	OK	
+sample	1	B	アルゴリズムとプログラミング	3	2025-02-09	OK	
+sample	2	B	アルゴリズムとプログラミング	3	2025-02-09	OK	
+sample	3	B	アルゴリズムとプログラミング	3	2025-02-09	OK	
+sample	4	B	情報セキュリティ	3	2025-02-09	OK	

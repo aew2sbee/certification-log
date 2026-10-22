@@ -1,0 +1,35 @@
+set	no	section	field	round	date	result	unknown
+r7-autumn	1	A	基礎理論	1	2026-09-06	OK	
+r7-autumn	2	A	アルゴリズムとプログラミング	1	2026-09-06	NG	逆ポーランド記法
+r7-autumn	3	A	コンピュータ構成要素	1	2026-09-06	NG	パイプラインハザード
+r7-autumn	4	A	システム構成要素	1	2026-09-06	OK	
+r7-autumn	5	A	ソフトウェア	1	2026-09-06	NG	セマフォ
+r7-autumn	6	A	データベース	1	2026-09-06	OK	
+r7-autumn	7	A	データベース	1	2026-09-06	NG	第3正規形
+r7-autumn	8	A	ネットワーク	1	2026-09-06	NG	サブネットマスク;CIDR
+r7-autumn	9	A	ネットワーク	1	2026-09-06	OK	
+r7-autumn	10	A	セキュリティ	1	2026-09-06	NG	SPF;DKIM
+r7-autumn	11	A	セキュリティ	1	2026-09-06	OK	
+r7-autumn	12	A	システム構成要素	1	2026-09-06	NG	MTBF;MTTR
+r7-autumn	13	A	プロジェクトマネジメント	1	2026-09-06	OK	
+r7-autumn	14	A	サービスマネジメント	1	2026-09-06	NG	ITIL
+r7-autumn	15	A	経営戦略	1	2026-09-06	OK	PPM
+r7-autumn	1	A	基礎理論	2	2026-09-20	OK	
+r7-autumn	2	A	アルゴリズムとプログラミング	2	2026-09-20	OK	
+r7-autumn	3	A	コンピュータ構成要素	2	2026-09-20	NG	パイプラインハザード
+r7-autumn	4	A	システム構成要素	2	2026-09-20	OK	
+r7-autumn	5	A	ソフトウェア	2	2026-09-20	OK	
+r7-autumn	6	A	データベース	2	2026-09-20	OK	
+r7-autumn	7	A	データベース	2	2026-09-20	NG	第3正規形;推移的関数従属
+r7-autumn	8	A	ネットワーク	2	2026-09-20	OK	
+r7-autumn	9	A	ネットワーク	2	2026-09-20	OK	
+r7-autumn	10	A	セキュリティ	2	2026-09-20	NG	DMARC
+r7-autumn	11	A	セキュリティ	2	2026-09-20	OK	
+r7-autumn	12	A	システム構成要素	2	2026-09-20	NG	MTBF
+r7-autumn	13	A	プロジェクトマネジメント	2	2026-09-20	OK	
+r7-autumn	14	A	サービスマネジメント	2	2026-09-20	OK	
+r7-autumn	15	A	経営戦略	2	2026-09-20	OK	
+r7-autumn	3	A	コンピュータ構成要素	3	2026-10-12	OK	
+r7-autumn	7	A	データベース	3	2026-10-12	OK	
+r7-autumn	10	A	セキュリティ	3	2026-10-12	NG	DMARC
+r7-autumn	12	A	システム構成要素	3	2026-10-12	OK	

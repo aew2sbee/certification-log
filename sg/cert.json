@@ -1,0 +1,17 @@
+{
+  "id": "sg",
+  "name": "情報セキュリティマネジメント試験",
+  "status": "passed",
+  "passedOn": null,
+  "passLine": 0.6,
+  "passRule": "total",
+  "sections": [
+    { "id": "A", "name": "科目A", "type": "choice" },
+    { "id": "B", "name": "科目B", "type": "choice" }
+  ],
+  "examDates": [],
+  "sets": [
+    { "id": "mock01", "name": "模擬試験 第1回", "files": "mock01.tsv" }
+  ],
+  "notes": []
+}

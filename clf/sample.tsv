@@ -1,0 +1,17 @@
+set	no	section	field	round	date	result	unknown
+sample	1	CLF	クラウドのコンセプト	1	2024-11-03	OK	
+sample	2	CLF	クラウドのコンセプト	1	2024-11-03	NG	Well-Architected フレームワーク
+sample	3	CLF	セキュリティとコンプライアンス	1	2024-11-03	OK	責任共有モデル
+sample	4	CLF	セキュリティとコンプライアンス	1	2024-11-03	NG	AWS Artifact
+sample	5	CLF	クラウドテクノロジーとサービス	1	2024-11-03	OK	
+sample	6	CLF	クラウドテクノロジーとサービス	1	2024-11-03	NG	AWS Outposts;Local Zones
+sample	7	CLF	請求・料金・サポート	1	2024-11-03	OK	
+sample	8	CLF	請求・料金・サポート	1	2024-11-03	NG	Savings Plans
+sample	1	CLF	クラウドのコンセプト	2	2024-11-10	OK	
+sample	2	CLF	クラウドのコンセプト	2	2024-11-10	OK	
+sample	3	CLF	セキュリティとコンプライアンス	2	2024-11-10	OK	
+sample	4	CLF	セキュリティとコンプライアンス	2	2024-11-10	OK	
+sample	5	CLF	クラウドテクノロジーとサービス	2	2024-11-10	OK	
+sample	6	CLF	クラウドテクノロジーとサービス	2	2024-11-10	NG	Local Zones
+sample	7	CLF	請求・料金・サポート	2	2024-11-10	OK	
+sample	8	CLF	請求・料金・サポート	2	2024-11-10	OK	
