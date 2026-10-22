@@ -1,5 +1,6 @@
 # main に push されたら GitHub Pages に公開する。
-# src/ の HTML / CSS / JS と、記録データの certification/ を同じ階層に並べて公開する。
+# src/ の HTML / CSS / JS と、記録データの certification/ を同じ階層に並べ、
+# certification/ の中身の一覧（index.json）を作って公開する。
 name: Deploy to GitHub Pages
 
 on:
@@ -30,6 +31,7 @@ jobs:
           mkdir _site
           cp -r src/. _site/
           cp -r certification _site/
+          python3 .github/scripts/build_index.py _site/certification
 
       - uses: actions/configure-pages@v6
 

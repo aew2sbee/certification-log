@@ -1,5 +1,5 @@
 /*
- * certification-log 共通スクリプト（TSV の読み込み・集計・描画）
+ * certification-log 共通スクリプト（記録の読み込み・集計・描画）
  *
  * <body data-page="..."> でページの種類を受け取る。
  *   home     … トップ（資格一覧）
@@ -12,8 +12,11 @@
   const PAGE = document.body.dataset.page || 'home';
   // 記録データは certification/ にある。公開時は src/ の中身と certification/ が同じ階層に並び、
   // ローカルでリポジトリのルートから src/ を開いたときは 1 つ上の階層にある
-  const DATA = `${/\/src\/[^/]*$/.test(location.pathname) ? '../' : './'}certification/`;
+  const LOCAL = /\/src\/[^/]*$/.test(location.pathname);
+  const DATA = `${LOCAL ? '../' : './'}certification/`;
   const STATUS = { studying: '学習中', passed: '✓ 合格' };
+  const MARKS = { OK: 'OK', NG: 'NG', '○': 'OK', '◯': 'OK', '×': 'NG', '✕': 'NG', '✗': 'NG' };
+  const UNSET = '（分野未設定）';
   const WEEK = '日月火水木金土';
   const EPS = 1e-9;
 
@@ -59,7 +62,7 @@
   const certUrl = (id, hash = '') => `cert.html?id=${encodeURIComponent(id)}${hash ? `#${encodeURIComponent(hash)}` : ''}`;
   // 問題を一意に表すID（解答グリッドの行のアンカーにも使う）とメモのファイル名
   const qid = (set, section, no) => `q-${set}-${section}-${no}`.replace(/\s+/g, '_');
-  const noteName = (set, section, no) => `${set}-${String(section).toLowerCase()}-q${no}.md`;
+  const noteName = (file, no) => `${file}-q${no}.md`;
 
   /* ---------- 読み込み ---------- */
 
@@ -95,22 +98,75 @@
     }
   }
 
+  // 資格フォルダと、その中の TSV・メモの一覧（新しい年月のフォルダから順に並べる）。
+  // 公開時は GitHub Actions が作る index.json を読み、ローカルでは python -m http.server のフォルダ一覧から作る
+  async function loadIndex() {
+    const certs = LOCAL ? await listLocal() : (await fetchJSON(`${DATA}index.json`)).certs;
+    return certs.sort((a, b) => cmp(b.dir, a.dir));
+  }
+
+  async function listDir(url) {
+    const doc = new DOMParser().parseFromString(await fetchText(url), 'text/html');
+    return [...doc.querySelectorAll('a[href]')]
+      .map((a) => decodeURIComponent(a.getAttribute('href')))
+      .filter((href) => !/^[?#/]|^\.\.|:/.test(href));
+  }
+
+  async function listLocal() {
+    const dirs = (await listDir(DATA)).filter((e) => e.endsWith('/')).map((e) => e.slice(0, -1));
+    const certs = await Promise.all(
+      dirs.map(async (dir) => {
+        const base = `${DATA}${encodeURIComponent(dir)}/`;
+        const entries = await listDir(base);
+        if (!entries.includes('cert.json')) return null;
+        const notes = entries.includes('notes/') ? (await listDir(`${base}notes/`)).filter((f) => /\.md$/i.test(f)) : [];
+        return { dir, files: entries.filter((f) => /\.tsv$/i.test(f)), notes };
+      })
+    );
+    return certs.filter(Boolean);
+  }
+
+  // 横持ちの TSV：1 行 = 1 問。先頭の列が問題番号、見出しに「分野」を含む列が分野。
+  // 残りの列は左から順に 1 回目・2 回目…の結果で、そのすぐ右の「単語」列がその回の分からなかった単語。
+  // 回は見出しの文字ではなく列の並び順で数える。見出しに日付（2026-09-06）があればその回の解答日として使う
   function parseTSV(text) {
-    const lines = text.split(/\r\n|\r|\n/).filter((l) => l.trim() !== '');
     const cell = (c) => {
       c = c.trim();
       return c.length > 1 && c[0] === '"' && c.at(-1) === '"' ? c.slice(1, -1).replace(/""/g, '"').trim() : c;
     };
-    const header = (lines.shift() || '').split('\t').map((h) => cell(h).toLowerCase());
+    const lines = text.split(/\r\n|\r|\n/).filter((l) => l.trim() !== '');
+    const header = (lines.shift() || '').split('\t').map(cell);
+    let fieldCol = -1;
+    const rounds = [];
+    header.forEach((h, i) => {
+      if (i === 0 || /メモ|備考/.test(h)) return;
+      if (/分野/.test(h)) fieldCol = i;
+      else if (/単語/.test(h)) {
+        if (rounds.length) rounds.at(-1).wordsCol = i;
+      } else rounds.push({ col: i, wordsCol: -1, date: (/\d{4}-\d{1,2}-\d{1,2}/.exec(h) || [''])[0] });
+    });
+    const misplaced = new Set(); // 単語の列に OK / NG が入っている列（回の見出しの付け忘れ）
     const rows = lines.map((line) => {
       const cols = line.split('\t').map(cell);
-      return Object.fromEntries(header.map((h, i) => [h, cols[i] ?? '']));
+      return {
+        no: (cols[0] || '').replace(/^問/, '').trim(),
+        field: fieldCol >= 0 ? cols[fieldCol] || '' : '',
+        rounds: rounds.map((r, i) => {
+          const words = r.wordsCol >= 0 ? cols[r.wordsCol] || '' : '';
+          if (MARKS[words.normalize('NFKC').trim().toUpperCase()]) misplaced.add(r.wordsCol);
+          return { round: i + 1, date: r.date, value: cols[r.col] || '', words };
+        }),
+      };
     });
-    return { header, rows };
+    const issues = [...misplaced].map(
+      (c) => `${c + 1}列目「${header[c]}」に OK / NG が入っています。回の見出し（「${rounds.length + 1}回目」など）が足りないかもしれません`
+    );
+    return { rows, issues };
   }
 
-  // cert.json と、そこに書かれた TSV をすべて読み込んで 1 資格分のデータにする
-  async function loadCert(id) {
+  // cert.json と TSV を読み込んで 1 資格分のデータにする
+  async function loadCert(entry) {
+    const id = entry.dir;
     const base = `${DATA}${encodeURIComponent(id)}/`;
     const cert = await fetchJSON(`${base}cert.json`);
     const passLine = Number(cert.passLine ?? 0.6);
@@ -118,92 +174,42 @@
       id: String(s.id),
       name: s.name || String(s.id),
       type: s.type === 'score' ? 'score' : 'choice',
+      max: Number(s.max) || null,
+      fields: s.fields || [],
       required: s.required || [],
       choose: Number(s.choose) || 0,
     }));
-    const findSection = (v) => {
-      const key = norm(v);
-      return key ? sections.find((s) => norm(s.id) === key) : undefined;
-    };
-    const addSection = (sid, isScore) => {
-      let s = findSection(sid);
-      if (!s) sections.push((s = { id: sid, name: sid, type: isScore ? 'score' : 'choice', required: [], choose: 0 }));
-      return s;
-    };
-    const sets = (cert.sets || []).map((s) => ({ id: String(s.id), name: s.name || String(s.id), sectionIds: new Set() }));
+    const findSection = (v) => sections.find((s) => norm(s.id) === norm(v));
 
-    // files は { 科目ID: ファイル名 } か、全科目をまとめた 1 ファイル名。同じファイルは 1 回だけ読む
-    const jobs = [];
-    (cert.sets || []).forEach((raw, i) => {
-      const set = sets[i];
-      const entries = typeof raw.files === 'string' ? [['', raw.files]] : Object.entries(raw.files || {});
-      const byFile = groupBy(entries, ([, file]) => file);
-      for (const [file, pairs] of byFile) {
-        const mapped = pairs.map(([sec]) => sec).filter(Boolean);
-        mapped.forEach((sec) => findSection(sec) && set.sectionIds.add(findSection(sec).id));
-        jobs.push({ set, file, mapped });
-      }
+    // ファイル名の末尾が「-科目ID」「_科目ID」ならその科目のファイル（r7-autumn-b.tsv → 問題セット r7-autumn の科目B）。
+    // 付いていなければ cert.json の最初の科目として扱う
+    const files = [...(entry.files || [])].sort(cmp).map((file) => {
+      const stem = file.replace(/\.tsv$/i, '');
+      const m = /^(.+)[-_]([^-_]+)$/.exec(stem);
+      const sec = m && findSection(m[2]);
+      return { file, stem, set: sec ? m[1] : stem, section: sec || sections[0] };
     });
-    const texts = await Promise.allSettled(jobs.map((j) => fetchText(base + encodeURI(j.file))));
+    const texts = await Promise.allSettled(files.map((f) => fetchText(base + encodeURIComponent(f.file))));
 
     const warnings = [];
-    const latest = new Map(); // 同じ「セット・科目・問題・回」の行が複数あれば後の行を採用
-    jobs.forEach((job, i) => {
+    const latest = new Map(); // 同じ「セット・科目・問題・回」が複数あれば後のものを採用
+    files.forEach((f, i) => {
       if (texts[i].status === 'rejected') {
         warnings.push(texts[i].reason.message);
         return;
       }
-      const { header, rows } = parseTSV(texts[i].value);
-      const isScore = header.includes('score');
-      let mismatch = false;
+      const { rows, issues } = parseTSV(texts[i].value);
+      issues.forEach((msg) => warnings.push(`${f.file}：${msg}`));
       for (const row of rows) {
-        if (!row.no) continue;
-        const sec =
-          findSection(row.section) ||
-          (job.mapped.length === 1 && findSection(job.mapped[0])) ||
-          (sections.length === 1 && sections[0]) ||
-          addSection(row.section || job.mapped[0] || '?', isScore);
-        if ((sec.type === 'score') !== isScore && !mismatch) {
-          mismatch = true;
-          warnings.push(`${job.file}：科目「${sec.name}」は type "${sec.type}" ですが、TSV の列は${isScore ? '記述式（score）' : '選択式（result）'}の形式です`);
-        }
-        const rec = {
-          set: job.set.id,
-          section: sec.id,
-          type: sec.type,
-          no: row.no,
-          field: row.field || '（分野未設定）',
-          round: parseInt(row.round, 10) || 1,
-          date: row.date || '',
-          unknown: (row.unknown || '').split(/[;；]/).map((w) => w.trim()).filter(Boolean),
-          answered: false,
-          ok: null,
-          value: 0, // 1 問あたりの得点率（選択式は 1 / 0）
-          pts: 0,
-          full: 0,
-        };
-        if (sec.type === 'score') {
-          const score = parseFloat(row.score);
-          const max = parseFloat(row.max);
-          rec.score = Number.isFinite(score) ? score : null;
-          rec.max = Number.isFinite(max) && max > 0 ? max : null;
-          if (rec.score != null && rec.max != null) {
-            Object.assign(rec, { answered: true, pts: score, full: max, value: score / max, ok: passes(score / max, passLine) });
-          }
-        } else {
-          const result = norm(row.result).toUpperCase();
-          rec.result = result === 'OK' || result === 'NG' ? result : '';
-          if (rec.result) {
-            const ok = result === 'OK';
-            Object.assign(rec, { answered: true, pts: ok ? 1 : 0, full: 1, value: ok ? 1 : 0, ok });
-          }
-        }
-        job.set.sectionIds.add(sec.id);
-        latest.set([rec.set, rec.section, rec.no, rec.round].join('\t'), rec);
+        for (const rec of toRecords(row, f, passLine)) latest.set([rec.set, rec.section, rec.no, rec.round].join('\t'), rec);
       }
     });
 
-    for (const set of sets) set.sections = sections.filter((s) => set.sectionIds.has(s.id));
+    const sets = uniq(files.map((f) => f.set)).map((setId) => ({
+      id: setId,
+      name: setId,
+      sections: sections.filter((s) => files.some((f) => f.set === setId && f.section === s)),
+    }));
     return {
       id, // フォルダ名（URL やファイルの場所に使う）
       label: String(cert.id || id).toUpperCase(), // 単語帳などに出す短い名前
@@ -214,9 +220,63 @@
       sections,
       sets,
       records: [...latest.values()],
-      notes: new Set(cert.notes || []),
+      notes: new Set(entry.notes || []),
       warnings,
     };
+  }
+
+  // 分野：「分野」列があればその値、空なら cert.json の sections[].fields の問題番号の範囲で決める
+  function fieldOf(section, row) {
+    if (row.field) return row.field;
+    const n = parseInt(row.no, 10);
+    return section.fields.find((f) => n >= f.from && n <= f.to)?.name || UNSET;
+  }
+
+  function toRecords(row, f, passLine) {
+    if (!row.no) return [];
+    const sec = f.section;
+    const field = fieldOf(sec, row);
+    const out = [];
+    for (const r of row.rounds) {
+      const unknown = r.words
+        .split(/[;；、,，]/)
+        .map((w) => w.trim())
+        .filter((w) => w && !MARKS[w.normalize('NFKC').toUpperCase()]);
+      const rec = {
+        set: f.set,
+        section: sec.id,
+        type: sec.type,
+        file: f.stem,
+        no: row.no,
+        field,
+        round: r.round,
+        date: r.date,
+        unknown,
+        answered: false,
+        ok: null,
+        value: 0, // 1 問あたりの得点率（選択式は 1 / 0）
+        pts: 0,
+        full: 0,
+      };
+      const value = r.value.normalize('NFKC').trim();
+      if (sec.type === 'score') {
+        // 記述式は「14/20」、満点を cert.json の max に書いていれば「14」だけでもよい
+        const m = /^(\d+(?:\.\d+)?)\s*(?:\/\s*(\d+(?:\.\d+)?))?$/.exec(value);
+        const score = m ? +m[1] : NaN;
+        const max = m && m[2] ? +m[2] : sec.max;
+        if (Number.isFinite(score) && max > 0) {
+          Object.assign(rec, { answered: true, score, max, pts: score, full: max, value: score / max, ok: passes(score / max, passLine) });
+        }
+      } else {
+        const result = MARKS[value.toUpperCase()];
+        if (result) {
+          const ok = result === 'OK';
+          Object.assign(rec, { answered: true, result, pts: ok ? 1 : 0, full: 1, value: ok ? 1 : 0, ok });
+        }
+      }
+      if (rec.answered || unknown.length) out.push(rec);
+    }
+    return out;
   }
 
   /* ---------- 集計 ---------- */
@@ -252,6 +312,16 @@
     };
   }
 
+  // 正答率の低い分野（分野が決まっている解答だけで集計）
+  function weakFields(data, limit = 3) {
+    const recs = data.records.filter((r) => r.answered && r.field !== UNSET);
+    return [...groupBy(recs, (r) => r.field)]
+      .map(([field, rs]) => ({ field, t: tally(rs) }))
+      .filter((x) => x.t.rate < 1)
+      .sort((a, b) => a.t.rate - b.t.rate || b.t.n - a.t.n)
+      .slice(0, limit);
+  }
+
   // 問題ごとに全回の記録をまとめる
   function questionsOf(data) {
     const setIdx = new Map(data.sets.map((s, i) => [s.id, i]));
@@ -259,8 +329,8 @@
     const qs = [...groupBy(data.records, (r) => qid(r.set, r.section, r.no))].map(([key, recs]) => {
       recs.sort((a, b) => a.round - b.round);
       const answered = recs.filter((r) => r.answered);
-      const { set, section, no } = recs[0];
-      const note = noteName(set, section, no);
+      const { set, section, no, file } = recs[0];
+      const note = noteName(file, no);
       return {
         key,
         set,
@@ -268,6 +338,7 @@
         no,
         recs,
         field: recs.at(-1).field,
+        first: answered[0] || null,
         latest: answered.at(-1) || null,
         ngCount: answered.filter((r) => !r.ok).length,
         words: uniq(recs.flatMap((r) => r.unknown)),
@@ -349,13 +420,19 @@
     </div>`;
   }
 
+  // 最終学習日は TSV の見出しに日付があるときだけ出す。なければ問題セット数
+  function lastStat(data, lastDate) {
+    return lastDate ? ['最終学習日', esc(shortDate(lastDate))] : ['問題セット', `${data.sets.length}`];
+  }
+
   function statsList(data) {
     const { t, solved, lastDate } = overview(data);
+    const [lastLabel, lastValue] = lastStat(data, lastDate);
     return `<dl class="stats">
       <div><dt>正答率</dt><dd>${pct(t.rate)}</dd></div>
       <div><dt>解いた問題</dt><dd>${solved}<small>問</small></dd></div>
       <div><dt>のべ解答数</dt><dd>${t.n}<small>回</small></dd></div>
-      <div><dt>最終学習日</dt><dd>${lastDate ? esc(shortDate(lastDate)) : '—'}</dd></div>
+      <div><dt>${lastLabel}</dt><dd>${lastValue}</dd></div>
     </dl>`;
   }
 
@@ -381,8 +458,8 @@
 
   function showError(main, err) {
     const hint =
-      location.protocol === 'file:'
-        ? '<p>HTML ファイルを直接開くとデータを読み込めません。リポジトリのルートで <code>python -m http.server</code> を実行し、<code>http://localhost:8000/src/</code> を開いてください。</p>'
+      location.protocol === 'file:' || (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) && !LOCAL)
+        ? '<p>ローカルで確認するときは、リポジトリのルートで <code>python -m http.server</code> を実行し、<code>http://localhost:8000/src/</code> を開いてください。</p>'
         : '';
     main.innerHTML = `<div class="alert"><p><strong>読み込みに失敗しました。</strong>${esc(err.message)}</p>${hint}</div>`;
     console.error(err);
@@ -391,14 +468,16 @@
   /* ---------- トップ ---------- */
 
   async function renderHome(main) {
-    const ids = await fetchJSON(`${DATA}certs.json`);
-    const results = await Promise.allSettled(ids.map(loadCert));
+    const entries = await loadIndex();
+    const results = await Promise.allSettled(entries.map(loadCert));
     const card = (r, i) => {
       if (r.status === 'rejected') {
-        return `<div class="card"><div class="card-head"><h2>${esc(ids[i])}</h2></div><div class="alert">${esc(r.reason.message)}</div></div>`;
+        return `<div class="card"><div class="card-head"><h2>${esc(entries[i].dir)}</h2></div><div class="alert">${esc(r.reason.message)}</div></div>`;
       }
       const data = r.value;
       const { t, solved, lastDate } = overview(data);
+      const [lastLabel, lastValue] = lastStat(data, lastDate);
+      const weak = weakFields(data);
       return `<a class="card cert-card" href="${esc(certUrl(data.id))}">
         <div class="card-head"><h2>${esc(data.cert.name || data.id)}</h2>${statusBadge(data.cert.status)}</div>
         ${examBlock(data.cert)}
@@ -406,18 +485,25 @@
           <div class="card-rate-head"><span class="big">${pct(t.rate)}</span><span class="sub">正答率（合格基準 ${esc(ruleText(data))}）</span></div>
           ${meter(t.rate, data.passLine)}
         </div>
+        ${
+          weak.length
+            ? `<div class="card-weak"><span class="sub">苦手分野</span><ul>${weak
+                .map((w) => `<li${passes(w.t.rate, data.passLine) ? '' : ' class="is-low"'}>${esc(w.field)}<b>${pct(w.t.rate)}</b></li>`)
+                .join('')}</ul></div>`
+            : ''
+        }
         <dl class="mini">
           <div><dt>解いた問題</dt><dd>${solved}問</dd></div>
           <div><dt>のべ解答</dt><dd>${t.n}回</dd></div>
-          <div><dt>最終学習日</dt><dd>${lastDate ? esc(shortDate(lastDate)) : '—'}</dd></div>
+          <div><dt>${lastLabel}</dt><dd>${lastValue}</dd></div>
         </dl>
         ${data.warnings.length ? '<p class="card-warn">⚠ 読み込めないデータがあります</p>' : ''}
       </a>`;
     };
     main.innerHTML = `
       <h1 class="page-title">資格一覧</h1>
-      <p class="lead">過去問・模擬問題の解答記録から正答率を集計しています。</p>
-      <div class="cards">${results.map(card).join('')}</div>`;
+      <p class="lead">過去問・模擬問題の解答記録から、正答率と苦手分野を集計しています。</p>
+      ${entries.length ? `<div class="cards">${results.map(card).join('')}</div>` : '<p class="empty">certification/ に資格フォルダがありません。</p>'}`;
   }
 
   /* ---------- 資格ページ ---------- */
@@ -425,7 +511,9 @@
   async function renderCert(main) {
     const id = new URLSearchParams(location.search).get('id');
     if (!id) throw new Error('資格が指定されていません（cert.html?id=202610_ap のようにフォルダ名を付けて開いてください）');
-    const data = await loadCert(id);
+    const entry = (await loadIndex()).find((e) => e.dir === id);
+    if (!entry) throw new Error(`certification/${id}/（cert.json のあるフォルダ）が見つかりません`);
+    const data = await loadCert(entry);
     const name = data.cert.name || id;
     document.title = `${name} | certification-log`;
     const qs = questionsOf(data);
@@ -441,112 +529,49 @@
       </section>`,
       warningsBlock(data.warnings),
       data.records.length
-        ? [setResults(data), weakList(data, qs), fieldRates(data), scoreFields(data), answerGrid(data, qs)].join('')
-        : '<p class="empty">まだ記録がありません。TSV に行を追加し、cert.json の sets に登録してください。</p>',
+        ? [fieldRates(data, qs), scoreFields(data), weakList(data, qs), setResults(data), answerGrid(data, qs)].join('')
+        : '<p class="empty">まだ記録がありません。このフォルダに TSV を置いてください。</p>',
     ].join('');
     setupNotes(main, data);
     focusHash();
   }
 
-  // 問題セットごと・回ごとの正答率と合否
-  function setResults(data) {
-    const html = data.sets
-      .map((set) => {
-        const recs = data.records.filter((r) => r.set === set.id);
-        if (!recs.length) return `<h3>${esc(set.name)}</h3><p class="empty">記録がありません</p>`;
-        const secs = set.sections;
-        const total = new Map(secs.map((s) => [s.id, new Set(recs.filter((r) => r.section === s.id).map((r) => r.no)).size]));
-        const rounds = uniq(recs.map((r) => r.round)).sort((a, b) => a - b);
-        const rows = rounds.map((round) => {
-          const inRound = recs.filter((r) => r.round === round);
-          const dates = uniq(inRound.map((r) => r.date).filter(Boolean)).sort();
-          const cells = secs.map((s) => {
-            const t = tally(inRound.filter((r) => r.section === s.id));
-            if (!t.n) return { pass: null, html: '<td><span class="muted">未記録</span></td>' };
-            const pass = passes(t.rate, data.passLine);
-            const partial = t.n < total.get(s.id) ? `全${total.get(s.id)}問中` : '';
-            return { pass, html: `<td>${rateCell(t, data.passLine, partial)}${data.passRule === 'each' ? verdict(pass) : ''}</td>` };
-          });
-          const sum = tally(inRound);
-          let pass = passes(sum.rate, data.passLine);
-          let note = '';
-          if (data.passRule === 'each') {
-            if (cells.some((c) => c.pass === false)) {
-              pass = false;
-            } else if (cells.some((c) => c.pass === null)) {
-              pass = null;
-              note = '未記録の科目あり';
-            } else {
-              pass = true;
-            }
-          }
-          const dateText = dates.length > 1 ? `${shortDate(dates[0])}〜${shortDate(dates.at(-1))}` : shortDate(dates[0] || '—');
-          return `<tr>
-            <th scope="row" class="nowrap">${round}回目</th>
-            <td class="nowrap">${esc(dateText)}</td>
-            ${cells.map((c) => c.html).join('')}
-            ${secs.length > 1 ? `<td>${rateCell(sum, data.passLine)}</td>` : ''}
-            <td>${verdict(pass, note)}</td>
-          </tr>`;
-        });
-        const head = `<tr><th>回</th><th>日付</th>${secs.map((s) => `<th>${esc(s.name)}</th>`).join('')}${secs.length > 1 ? '<th>トータル</th>' : ''}<th>判定</th></tr>`;
-        return `<h3>${esc(set.name)}</h3>${tableWrap(`<thead>${head}</thead><tbody>${rows.join('')}</tbody>`, 'results')}`;
-      })
-      .join('');
-    return block('問題セット別の成績', html, `合格基準は${ruleText(data)}。縦線が合格基準の位置です。未解答（空欄）は分母に含めません。`);
-  }
-
-  // 苦手問題：NG が 2 回以上、または最新の解答が NG
-  function weakList(data, qs) {
-    const weak = qs
-      .filter((q) => q.latest && (q.ngCount >= 2 || !q.latest.ok))
-      .sort((a, b) => a.latest.ok - b.latest.ok || b.ngCount - a.ngCount);
-    const hasNotes = weak.some((q) => q.note);
-    const rows = weak.map(
-      (q) => `<tr>
-        <th scope="row"><a href="#${esc(encodeURIComponent(q.key))}">${esc(questionLabel(data, q))}</a></th>
-        <td>${esc(q.field)}</td>
-        <td><span class="history">${q.recs.map(mark).join('')}</span></td>
-        <td class="num">${q.ngCount}</td>
-        <td>${words(q.words)}</td>
-        ${hasNotes ? `<td>${noteButton(data, q)}</td>` : ''}
-      </tr>`
-    );
-    const inner = weak.length
-      ? tableWrap(
-          `<thead><tr><th>問題</th><th>分野</th><th>これまでの結果</th><th class="num">NG</th><th>分からない単語</th>${hasNotes ? '<th>メモ</th>' : ''}</tr></thead><tbody>${rows.join('')}</tbody>`,
-          'weak'
-        )
-      : '<p class="empty">該当する問題はありません。</p>';
-    return block('苦手問題', inner, 'NG が 2 回以上、または最新の解答が NG の問題です（記述式は得点率が合格基準未満を NG とみなします）。');
-  }
-
-  // 分野別の正答率（選択式）
-  function fieldRates(data) {
+  // 分野別の正答率（選択式）。初回＝各問題を最初に解いたときの結果だけで計算したもの
+  function fieldRates(data, qs) {
     const html = data.sections
       .filter((s) => s.type === 'choice')
       .map((s) => {
         const recs = data.records.filter((r) => r.section === s.id && r.answered);
         if (!recs.length) return '';
+        const firsts = groupBy(
+          qs.filter((q) => q.section === s.id && q.first).map((q) => q.first),
+          (r) => r.field
+        );
         const rows = [...groupBy(recs, (r) => r.field)]
-          .map(([field, rs]) => ({ field, t: tally(rs) }))
+          .map(([field, rs]) => ({ field, t: tally(rs), first: tally(firsts.get(field) || []) }))
           .sort((a, b) => a.t.rate - b.t.rate || cmp(a.field, b.field));
         const body = rows
           .map(
-            ({ field, t }) => `<tr>
+            ({ field, t, first }) => `<tr>
               <th scope="row">${esc(field)}</th>
               <td class="bar-cell"><div class="bar-row"><span class="rate">${pct(t.rate)}</span>${meter(t.rate, data.passLine)}</div></td>
+              <td class="num">${pct(first.rate)}</td>
               <td class="num">${t.ok}/${t.n}</td>
+              <td class="num">${first.n}問</td>
             </tr>`
           )
           .join('');
         return `${data.sections.length > 1 ? `<h3>${esc(s.name)}</h3>` : ''}${tableWrap(
-          `<thead><tr><th>分野</th><th>正答率</th><th class="num">正解/解答</th></tr></thead><tbody>${body}</tbody>`,
+          `<thead><tr><th>分野</th><th>正答率</th><th class="num">初回</th><th class="num">正解/解答</th><th class="num">問題数</th></tr></thead><tbody>${body}</tbody>`,
           'bars'
         )}`;
       })
       .join('');
-    return block('分野別の正答率', html, 'すべての問題セット・回の解答を合計しています。正答率の低い順です。');
+    return block(
+      '分野別の正答率',
+      html,
+      '正答率の低い順です。「初回」は各問題を最初に解いたときの正答率です（2回目以降は答えを覚えていることがあるので、実力に近いのは初回です）。'
+    );
   }
 
   // 分野別の平均得点率（記述式）と選択候補
@@ -589,6 +614,82 @@
       html,
       '得点率の高い順です。必須分野以外で得点率の高い分野を「選択候補」として示します（数は cert.json の choose）。'
     );
+  }
+
+  // 苦手問題：NG が 2 回以上、または最新の解答が NG
+  function weakList(data, qs) {
+    const weak = qs
+      .filter((q) => q.latest && (q.ngCount >= 2 || !q.latest.ok))
+      .sort((a, b) => a.latest.ok - b.latest.ok || b.ngCount - a.ngCount);
+    const hasNotes = weak.some((q) => q.note);
+    const rows = weak.map(
+      (q) => `<tr>
+        <th scope="row"><a href="#${esc(encodeURIComponent(q.key))}">${esc(questionLabel(data, q))}</a></th>
+        <td>${esc(q.field)}</td>
+        <td><span class="history">${q.recs.map(mark).join('')}</span></td>
+        <td class="num">${q.ngCount}</td>
+        <td>${words(q.words)}</td>
+        ${hasNotes ? `<td>${noteButton(data, q)}</td>` : ''}
+      </tr>`
+    );
+    const inner = weak.length
+      ? tableWrap(
+          `<thead><tr><th>問題</th><th>分野</th><th>これまでの結果</th><th class="num">NG</th><th>分からない単語</th>${hasNotes ? '<th>メモ</th>' : ''}</tr></thead><tbody>${rows.join('')}</tbody>`,
+          'weak'
+        )
+      : '<p class="empty">該当する問題はありません。</p>';
+    return block('苦手問題', inner, 'NG が 2 回以上、または最新の解答が NG の問題です（記述式は得点率が合格基準未満を NG とみなします）。');
+  }
+
+  // 問題セットごと・回ごとの正答率と合否
+  function setResults(data) {
+    const html = data.sets
+      .map((set) => {
+        const recs = data.records.filter((r) => r.set === set.id);
+        if (!recs.length) return `<h3>${esc(set.name)}</h3><p class="empty">記録がありません</p>`;
+        const secs = set.sections;
+        const hasDates = recs.some((r) => r.date);
+        const total = new Map(secs.map((s) => [s.id, new Set(recs.filter((r) => r.section === s.id).map((r) => r.no)).size]));
+        const rounds = uniq(recs.map((r) => r.round)).sort((a, b) => a - b);
+        const rows = rounds.map((round) => {
+          const inRound = recs.filter((r) => r.round === round);
+          const dates = uniq(inRound.map((r) => r.date).filter(Boolean)).sort();
+          const cells = secs.map((s) => {
+            const t = tally(inRound.filter((r) => r.section === s.id));
+            if (!t.n) return { pass: null, html: '<td><span class="muted">未記録</span></td>' };
+            const pass = passes(t.rate, data.passLine);
+            const partial = t.n < total.get(s.id) ? `全${total.get(s.id)}問中` : '';
+            return { pass, html: `<td>${rateCell(t, data.passLine, partial)}${data.passRule === 'each' ? verdict(pass) : ''}</td>` };
+          });
+          const sum = tally(inRound);
+          let pass = passes(sum.rate, data.passLine);
+          let note = '';
+          if (data.passRule === 'each') {
+            if (cells.some((c) => c.pass === false)) {
+              pass = false;
+            } else if (cells.some((c) => c.pass === null)) {
+              pass = null;
+              note = '未記録の科目あり';
+            } else {
+              pass = true;
+            }
+          }
+          const dateText = dates.length > 1 ? `${shortDate(dates[0])}〜${shortDate(dates.at(-1))}` : shortDate(dates[0] || '—');
+          return `<tr>
+            <th scope="row" class="nowrap">${round}回目</th>
+            ${hasDates ? `<td class="nowrap">${esc(dateText)}</td>` : ''}
+            ${cells.map((c) => c.html).join('')}
+            ${secs.length > 1 ? `<td>${rateCell(sum, data.passLine)}</td>` : ''}
+            <td>${verdict(pass, note)}</td>
+          </tr>`;
+        });
+        const head = `<tr><th>回</th>${hasDates ? '<th>日付</th>' : ''}${secs.map((s) => `<th>${esc(s.name)}</th>`).join('')}${
+          secs.length > 1 ? '<th>トータル</th>' : ''
+        }<th>判定</th></tr>`;
+        return `<h3>${esc(set.name)}</h3>${tableWrap(`<thead>${head}</thead><tbody>${rows.join('')}</tbody>`, 'results')}`;
+      })
+      .join('');
+    return block('問題セット別の成績', html, `合格基準は${ruleText(data)}。縦線が合格基準の位置です。未解答（空欄）は分母に含めません。`);
   }
 
   // 解答グリッド：行が問題、列が回
@@ -649,7 +750,7 @@
       bodyEl.innerHTML = '<p class="loading">読み込み中…</p>';
       dialog.showModal();
       try {
-        bodyEl.innerHTML = renderMarkdown(await fetchText(dir + encodeURI(btn.dataset.note)), dir);
+        bodyEl.innerHTML = renderMarkdown(await fetchText(dir + encodeURIComponent(btn.dataset.note)), dir);
       } catch (err) {
         bodyEl.innerHTML = `<div class="alert">${esc(err.message)}</div>`;
       }
@@ -741,19 +842,19 @@
   /* ---------- 単語帳 ---------- */
 
   async function renderGlossary(main) {
-    const ids = await fetchJSON(`${DATA}certs.json`);
-    const results = await Promise.allSettled(ids.map(loadCert));
+    const entries = await loadIndex();
+    const results = await Promise.allSettled(entries.map(loadCert));
     const datas = results.filter((r) => r.status === 'fulfilled').map((r) => r.value);
-    const warnings = results.flatMap((r, i) => (r.status === 'rejected' ? [`${ids[i]}：${r.reason.message}`] : r.value.warnings));
+    const warnings = results.flatMap((r, i) => (r.status === 'rejected' ? [`${entries[i].dir}：${r.reason.message}`] : r.value.warnings));
 
     // 表記ゆれ（全角半角・大文字小文字）は同じ単語として扱う
-    const entries = new Map();
+    const found = new Map();
     for (const data of datas) {
       for (const r of data.records) {
         for (const w of r.unknown) {
           const key = norm(w);
-          if (!entries.has(key)) entries.set(key, { word: w, key, occ: [] });
-          entries.get(key).occ.push({ data, r });
+          if (!found.has(key)) found.set(key, { word: w, key, occ: [] });
+          found.get(key).occ.push({ data, r });
         }
       }
     }
@@ -790,7 +891,9 @@
       const { data, r } = occ[0];
       const rounds = uniq(occ.map((o) => o.r.round)).sort((a, b) => a - b).join('・');
       const q = { set: r.set, section: r.section, no: r.no };
-      return `<li><a href="${esc(certUrl(data.id, qid(r.set, r.section, r.no)))}"><span class="tag">${esc(data.label)}</span>${esc(questionLabel(data, q))}</a><span class="sub">（${rounds}回目）</span></li>`;
+      return `<li><a href="${esc(certUrl(data.id, qid(r.set, r.section, r.no)))}"><span class="tag">${esc(data.label)}</span>${esc(
+        questionLabel(data, q)
+      )}</a><span class="sub">（${rounds}回目）</span></li>`;
     };
     const row = (e) => {
       const places = [...groupBy(e.occ, (o) => `${o.data.id}\t${qid(o.r.set, o.r.section, o.r.no)}`).values()];
@@ -807,7 +910,7 @@
       const query = norm(qEl.value);
       const cert = certEl.value;
       const list = [];
-      for (const e of entries.values()) {
+      for (const e of found.values()) {
         if (query && !e.key.includes(query)) continue;
         const occ = cert ? e.occ.filter((o) => o.data.id === cert) : e.occ;
         if (occ.length) list.push({ ...e, occ, last: occ.map((o) => o.r.date).sort().at(-1) || '' });
@@ -821,7 +924,7 @@
       list.sort(sorters[sortEl.value]);
       main.querySelector('#rows').innerHTML = list.length
         ? list.map(row).join('')
-        : `<tr><td colspan="4" class="empty">${entries.size ? '該当する単語はありません' : 'まだ単語が記録されていません'}</td></tr>`;
+        : `<tr><td colspan="4" class="empty">${found.size ? '該当する単語はありません' : 'まだ単語が記録されていません'}</td></tr>`;
       main.querySelector('#count').textContent = `${list.length}語`;
 
       const next = new URLSearchParams();

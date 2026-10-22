@@ -9,9 +9,5 @@
     { "id": "A", "name": "科目A", "type": "choice" },
     { "id": "B", "name": "科目B", "type": "choice" }
   ],
-  "examDates": [],
-  "sets": [
-    { "id": "sample", "name": "サンプル問題", "files": "sample.tsv" }
-  ],
-  "notes": []
+  "examDates": []
 }

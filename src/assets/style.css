@@ -450,6 +450,36 @@ a.card:hover {
   margin: 0;
   font-weight: 600;
 }
+.card-weak {
+  display: grid;
+  gap: 6px;
+}
+.card-weak ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.card-weak li {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  font-size: 13px;
+}
+.card-weak b {
+  font-variant-numeric: tabular-nums;
+}
+.card-weak li.is-low {
+  background: color-mix(in srgb, var(--bad) 10%, var(--surface));
+}
+.card-weak li.is-low b {
+  color: var(--bad-text);
+}
 .card-warn {
   margin: 0;
   color: var(--bad-text);

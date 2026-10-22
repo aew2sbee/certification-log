@@ -1,35 +1,16 @@
-set	no	section	field	round	date	result	unknown
-r7-autumn	1	A	基礎理論	1	2026-09-06	OK	
-r7-autumn	2	A	アルゴリズムとプログラミング	1	2026-09-06	NG	逆ポーランド記法
-r7-autumn	3	A	コンピュータ構成要素	1	2026-09-06	NG	パイプラインハザード
-r7-autumn	4	A	システム構成要素	1	2026-09-06	OK	
-r7-autumn	5	A	ソフトウェア	1	2026-09-06	NG	セマフォ
-r7-autumn	6	A	データベース	1	2026-09-06	OK	
-r7-autumn	7	A	データベース	1	2026-09-06	NG	第3正規形
-r7-autumn	8	A	ネットワーク	1	2026-09-06	NG	サブネットマスク;CIDR
-r7-autumn	9	A	ネットワーク	1	2026-09-06	OK	
-r7-autumn	10	A	セキュリティ	1	2026-09-06	NG	SPF;DKIM
-r7-autumn	11	A	セキュリティ	1	2026-09-06	OK	
-r7-autumn	12	A	システム構成要素	1	2026-09-06	NG	MTBF;MTTR
-r7-autumn	13	A	プロジェクトマネジメント	1	2026-09-06	OK	
-r7-autumn	14	A	サービスマネジメント	1	2026-09-06	NG	ITIL
-r7-autumn	15	A	経営戦略	1	2026-09-06	OK	PPM
-r7-autumn	1	A	基礎理論	2	2026-09-20	OK	
-r7-autumn	2	A	アルゴリズムとプログラミング	2	2026-09-20	OK	
-r7-autumn	3	A	コンピュータ構成要素	2	2026-09-20	NG	パイプラインハザード
-r7-autumn	4	A	システム構成要素	2	2026-09-20	OK	
-r7-autumn	5	A	ソフトウェア	2	2026-09-20	OK	
-r7-autumn	6	A	データベース	2	2026-09-20	OK	
-r7-autumn	7	A	データベース	2	2026-09-20	NG	第3正規形;推移的関数従属
-r7-autumn	8	A	ネットワーク	2	2026-09-20	OK	
-r7-autumn	9	A	ネットワーク	2	2026-09-20	OK	
-r7-autumn	10	A	セキュリティ	2	2026-09-20	NG	DMARC
-r7-autumn	11	A	セキュリティ	2	2026-09-20	OK	
-r7-autumn	12	A	システム構成要素	2	2026-09-20	NG	MTBF
-r7-autumn	13	A	プロジェクトマネジメント	2	2026-09-20	OK	
-r7-autumn	14	A	サービスマネジメント	2	2026-09-20	OK	
-r7-autumn	15	A	経営戦略	2	2026-09-20	OK	
-r7-autumn	3	A	コンピュータ構成要素	3	2026-10-12	OK	
-r7-autumn	7	A	データベース	3	2026-10-12	OK	
-r7-autumn	10	A	セキュリティ	3	2026-10-12	NG	DMARC
-r7-autumn	12	A	システム構成要素	3	2026-10-12	OK	
+No	分野	1回目(2026-09-06)	分からなかった単語	2回目(2026-09-20)	分からなかった単語	3回目(2026-10-12)	分からなかった単語
+1	基礎理論	OK		OK			
+2	アルゴリズムとプログラミング	NG	逆ポーランド記法	OK			
+3	コンピュータ構成要素	NG	パイプラインハザード	NG	パイプラインハザード	OK	
+4	システム構成要素	OK		OK			
+5	ソフトウェア	NG	セマフォ	OK			
+6	データベース	OK		OK			
+7	データベース	NG	第3正規形	NG	第3正規形、推移的関数従属	OK	
+8	ネットワーク	NG	サブネットマスク、CIDR	OK			
+9	ネットワーク	OK		OK			
+10	セキュリティ	NG	SPF、DKIM	NG	DMARC	NG	DMARC
+11	セキュリティ	OK		OK			
+12	システム構成要素	NG	MTBF、MTTR	NG	MTBF	OK	
+13	プロジェクトマネジメント	OK		OK			
+14	サービスマネジメント	NG	ITIL	OK			
+15	経営戦略	OK	PPM	OK			

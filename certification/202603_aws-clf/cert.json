@@ -8,9 +8,5 @@
   "sections": [
     { "id": "CLF", "name": "CLF-C02", "type": "choice" }
   ],
-  "examDates": [],
-  "sets": [
-    { "id": "sample", "name": "サンプル問題", "files": "sample.tsv" }
-  ],
-  "notes": []
+  "examDates": []
 }

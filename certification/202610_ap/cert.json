@@ -6,15 +6,20 @@
   "passLine": 0.6,
   "passRule": "each",
   "sections": [
-    { "id": "A", "name": "科目A", "type": "choice" },
-    { "id": "B", "name": "科目B", "type": "score", "required": ["情報セキュリティ"], "choose": 4 }
+    {
+      "id": "A",
+      "name": "科目A",
+      "type": "choice",
+      "fields": [
+        { "from": 1, "to": 50, "name": "テクノロジ" },
+        { "from": 51, "to": 60, "name": "マネジメント" },
+        { "from": 61, "to": 80, "name": "ストラテジ" }
+      ]
+    },
+    { "id": "B", "name": "科目B", "type": "score", "max": 20, "required": ["情報セキュリティ"], "choose": 4 }
   ],
   "examDates": [
     { "label": "令和8年度後期 科目A", "from": "2027-02-06", "to": "2027-02-19" },
     { "label": "令和8年度後期 科目B", "from": "2027-03-03", "to": "2027-03-15" }
-  ],
-  "sets": [
-    { "id": "r7-autumn", "name": "令和7年度秋期", "files": { "A": "r7-autumn-a.tsv", "B": "r7-autumn-b.tsv" } }
-  ],
-  "notes": ["r7-autumn-a-q12.md"]
+  ]
 }
