@@ -1,9 +1,0 @@
-No	分野	1回目	分からなかった単語	2回目	分からなかった単語
-1	クラウドのコンセプト	OK		OK	
-2	クラウドのコンセプト	NG	Well-Architected フレームワーク	OK	
-3	セキュリティとコンプライアンス	OK	責任共有モデル	OK	
-4	セキュリティとコンプライアンス	NG	AWS Artifact	OK	
-5	クラウドテクノロジーとサービス	OK		OK	
-6	クラウドテクノロジーとサービス	NG	AWS Outposts、Local Zones	NG	Local Zones
-7	請求・料金・サポート	OK		OK	
-8	請求・料金・サポート	NG	Savings Plans	OK	
